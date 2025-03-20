@@ -1,0 +1,204 @@
+#include <create/create.hpp>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <array>
+#include <sstream>
+#include <cstdlib>
+#include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <cmath>
+#include <cstdint>
+#include <bit>
+
+using I = std::int32_t;
+using T = std::int32_t;
+
+constexpr I dim { 2 };
+constexpr T x_min { 0 };
+constexpr T x_max { 100 };
+constexpr T y_min { 0 };
+constexpr T y_max { 100 };
+
+constexpr std::string fname = "dat/kdtree.png";
+
+using arr_2d_t = std::vector<std::array<T, dim>>;
+using arr_1d_t = std::vector<T>; 
+
+struct line_t 
+{
+        T x1, y1, x2, y2;
+};
+
+static void 
+get_lines(
+    const arr_2d_t& pts,
+    int i,
+    T xmin, T xmax, T ymin, T ymax,
+    const arr_1d_t& axes,  // added axes parameter
+    std::vector<line_t>& lines
+) {
+        if (pts.empty()) return;
+
+        int axis = axes[i];
+        auto sorted = pts;
+
+        if (axis == 0) {
+                std::sort(sorted.begin(), sorted.end(),
+                                  [](const auto& a, const auto& b) {
+                                          return a[0] < b[0]; 
+                                  });
+        } else {
+                std::sort(sorted.begin(), sorted.end(),
+                                  [](const auto& a, const auto& b) {
+                                          return a[1] < b[1]; 
+                                  });
+        }
+
+        size_t mid = sorted.size() / 2;
+        auto median = sorted[mid];
+
+        if (axis == 0) {
+                lines.push_back({ median[0], ymin, median[0], ymax });
+                arr_2d_t l(sorted.begin(), sorted.begin() + mid);
+                arr_2d_t r(sorted.begin() + mid + 1, sorted.end());
+                get_lines(l, i + 1, xmin, median[0], ymin, ymax, axes, lines);
+                get_lines(r, i + 1, median[0], xmax, ymin, ymax, axes, lines);
+        } else {
+                lines.push_back({ xmin, median[1], xmax, median[1] });
+                arr_2d_t b(sorted.begin(), sorted.begin() + mid);
+                arr_2d_t t(sorted.begin() + mid + 1, sorted.end());
+                get_lines(b, i + 1, xmin, xmax, ymin, median[1], axes, lines);
+                get_lines(t, i + 1, xmin, xmax, median[1], ymax, axes, lines);
+        }
+}
+
+
+enum class dataset_type
+{
+        basic,
+        cluster,
+        circle
+};
+
+static arr_2d_t 
+generate_dataset(dataset_type type) 
+{
+
+        arr_2d_t dataset;
+ 
+        switch(type) {
+ 
+        case dataset_type::basic:
+                dataset = {
+                    { { 10, 15 } }, { { 46, 63 } },
+                    { { 68, 21 } }, { { 40, 33 } },
+                    { { 25, 54 } }, { { 15, 43 } },
+                    { { 44, 58 } }, { { 45, 40 } },
+                    { { 62, 69 } }, { { 53, 67 } }
+                };
+                break;
+
+        case dataset_type::cluster:
+                dataset = {
+                        { { 47, 101 } }, { { 46, 99 } }, { { 46, 92 } }, { { 40, 102 } }, { { 47, 91 } }, { { 45, 91 } }, { { 48, 97 } }, { { 53, 95 } }, { { 52, 92 } }, { { 50, 94 } }, { { 48, 93 } }, { { 53, 97 } }, { { 42, 100 } }, { { 49, 94 } }, { { 44, 89 } }, { { 56, 97 } }, { { 41, 91 } }, { { 45, 102 } }, { { 50, 83 } }, { { 43, 100 } }, { { 51, 96 } }, { { 55, 93 } } ,
+                        { { 11, 51 } }, { { 0, 51 } }, { { 8, 57 } }, { { 12, 63 } }, { { 0, 56 } }, { { 4, 52 } }, { { 0, 54 } }, { { 2, 57 } }, { { 12, 56 } }, { { 4, 51 } }, { { 12, 54 } }, { { 11, 57 } }, { { 4, 53 } }, { { 3, 49 } }, { { 7, 56 } }, { { 1, 52 } }, { { 4, 45 } }, { { 1, 53 } }, { { -1, 49 } }, { { -1, 51 } }, { { 1, 55 } } ,
+                        { { 81, 81 } }, { { 71, 79 } }, { { 74, 82 } }, { { 80, 79 } }, { { 68, 88 } }, { { 73, 79 } }, { { 67, 84 } }, { { 62, 85 } }, { { 70, 71 } }, { { 66, 75 } }, { { 73, 80 } }, { { 70, 82 } }, { { 70, 83 } }, { { 63, 89 } }, { { 84, 77 } }, { { 74, 85 } }, { { 72, 83 } }, { { 70, 94 } }, { { 67, 95 } }, { { 68, 84 } }, { { 69, 87 } } 
+                };
+                break;
+ 
+        case dataset_type::circle:
+ 
+                std::srand(static_cast<unsigned int>(std::time(nullptr)));
+             
+                const int num_points = 30;
+                const double c_x = 50.0;
+                const double c_y = 50.0;
+                const double radius = 40.0;
+                const double noise_amplitude = 3.0;
+             
+                for (int i = 0; i < num_points; i++) {
+                        double ang = 2.0 * M_PI * i / num_points;
+                        double nse = ((
+                                std::rand() / static_cast<double>(RAND_MAX)
+                        ) * 2.0 - 1.0) * noise_amplitude;
+                        double r = radius + nse;
+                        T x = static_cast<T>(std::round(c_x+r*std::cos(ang)));
+                        T y = static_cast<T>(std::round(c_y+r*std::sin(ang)));
+                        dataset.push_back({ x, y });
+                }
+                dataset.push_back({static_cast<T>(c_x), static_cast<T>(c_y)});
+ 
+                break;
+        }
+ 
+        return dataset;
+
+}
+
+
+int 
+main(void) 
+{
+
+        constexpr I n { 10 };
+
+        arr_2d_t vec = generate_dataset(dataset_type::cluster);
+
+        arr_1d_t axes(n);
+        for (std::size_t i{0}; i < n; ++i) {
+                axes[i] =  (std::bit_width(i) - 1) % dim;
+        } 
+
+        sd::kdtree::create(vec.begin(), vec.end());
+
+        std::ofstream dataFile("dat/kdtree.dat");
+        if (!dataFile) {
+                std::cerr << "Error: Could not open data file for writing." 
+                          << std::endl;
+                return 1;
+        }
+        for (const auto& pt : vec) {
+                dataFile << pt[0] << " " << pt[1] << "\n";
+        }
+        dataFile.close();
+
+        std::vector<line_t> lines;
+        get_lines(vec, 0, x_min, x_max, y_min, y_max, axes, lines);
+
+        std::ofstream lineFile("dat/kdtree_lines.dat");
+        if (!lineFile) {
+                std::cerr << "Error: Could not open lines file for writing." 
+                          << std::endl;
+                return 1;
+        }
+        for (const auto& l : lines) {
+                lineFile << l.x1 << " " << l.y1 << "\n"
+                         << l.x2 << " " << l.y2 << "\n\n";
+        }
+        lineFile.close();
+
+        std::ostringstream cmd;
+        cmd << "gnuplot -persist <<EOF\n"
+            << "set terminal pngcairo font 'Serif,10' size 400,400\n"
+            << "set output '" << fname << "'\n"
+            << "set xrange [" << x_min << ":" << x_max << "]\n"
+            << "set yrange [" << y_min << ":" << y_max << "]\n"
+            << "set size ratio 1\n"
+            << "plot 'dat/kdtree_lines.dat' with lines lt rgb 'red' lw 2 notitle, \\\n"
+            << "     'dat/kdtree.dat' using 1:2 with points pointtype 7 pointsize 1 lc rgb 'black' notitle\n"
+            << "EOF\n";
+
+        std::cout << "Running gnuplot command:\n" << cmd.str() << std::endl;
+        int ret = system(cmd.str().c_str());
+        if (ret != 0) {
+                std::cerr << "Gnuplot command failed with exit code " << ret << "\n";
+                return 1;
+        }
+
+        return 0;
+
+}
+
